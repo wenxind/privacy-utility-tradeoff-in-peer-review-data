@@ -2,6 +2,9 @@ import numpy as np
 import cvxpy as cp
 import random
 import matplotlib.pyplot as plt
+import itertools 
+import matplotlib
+matplotlib.rcParams.update({'font.size': 28})
 
 '''
 there are 2 papers per reviewer and 2 reviews per paper  ___ k 
@@ -16,68 +19,69 @@ n can be changed
 - Repeat form beginning (100 trials -- compute the mean accuracies and standard error)
 '''
 
+#scores are assigned to papers in the order of No.
+#e.g., k=l=2, (1, ) (2, ) are scores for paper 1, (3, ) (4, ) are scores for paper 2
+
 def create_scores(n, k):
     result = []
     for i in range(1,n*k+1):        
-        result.append((i, np.random.beta(i%2+1,i%n+1)))
-    #print(result)
+        result.append((i, np.random.beta(2,2)))
     return result
 
-def assign_score_papers(n, k, scoreset):
-    result = dict()
-    for i in range(n):
-        result[scoreset[i*k]] = i+1
-        result[scoreset[i*k+1]]= i+1
-    return result
+
+def valid_tuple(w_tuple, k):
+    s = set((w_tuple[i][0]-1)//k for i in range(k))
+    return len(s)==k
 
 
 def valid_assignments(n, k, scoreset):
     result = []
-    for i in range(n):
-        for j in range(k):
-            for restscore in (scoreset[i*k+k:]):
-                result.append((scoreset[i*k+j], restscore))
+    all_tuples = list(itertools.combinations(scoreset, k)) 
+    for w_tuple in all_tuples:
+        if valid_tuple(w_tuple, k):
+            result.append(w_tuple)
     return result
 
+
 def no_cross(a, b):
-    if a[0]==b[0] or a[0]==b[1] or a[1]==b[0] or a[1]==b[1]:
-        return False
-    else:
-        return True
+    return set(a).intersection(set(b)) == set()
+
 
 def edge_map(assignments):
     graph = dict()
-    for (s1, s2) in assignments:
-        graph[(s1, s2)] = set()
+    num_assignments = len(assignments)
+    for i in range(num_assignments):
+        graph[assignments[i]] = set()
 
-    for i in range(len(assignments)):
-        for (s1, s2) in assignments[i+1:]:
-            if no_cross(assignments[i], (s1, s2)):
-                graph[assignments[i]].add((s1, s2))
-                graph[(s1, s2)].add(assignments[i])
-
+    for i in range(num_assignments):
+        for j in range(i+1, num_assignments):
+            if no_cross(assignments[i], assignments[j]):
+                graph[assignments[i]].add(assignments[j])
+                graph[assignments[j]].add(assignments[i])
     return graph
 
+
 def sort_assignments(assignments):
-    result = sorted(assignments, key=lambda x: x[0][1]+x[1][1])
+    result = sorted(assignments, key=lambda scores: sum(scores[i][1] for i in range(len(scores))))
     return result
+
 
 def lr_chain(sorted_assignments, graph):
     chain_map = dict()
-    sort_map = dict()
+    index_map = dict()
     total_assignments = len(sorted_assignments)
 
     for i in range(total_assignments):
         chain_map[sorted_assignments[i]] = [1, 1]
-        sort_map[sorted_assignments[i]] = i
+        index_map[sorted_assignments[i]] = i
 
     for i in range(total_assignments):
         elem = sorted_assignments[i]
         neighbors = graph[elem]
         left = []
-        for (a, b) in neighbors:   
-            if sort_map[(a, b)] < sort_map[elem]:
-                left.append(chain_map[(a, b)][0]+1)
+        for neighbor in neighbors:   
+            if index_map[neighbor] < index_map[elem]:
+                left.append(chain_map[neighbor][0]+1)
         if left != []:
             chain_map[elem][0] = max(left)
 
@@ -85,18 +89,19 @@ def lr_chain(sorted_assignments, graph):
         elem = sorted_assignments[total_assignments-1-i]
         neighbors = graph[elem]
         right = []
-        for (a, b) in neighbors:   
-            if sort_map[(a, b)] > sort_map[elem]:
-                right.append(chain_map[(a, b)][1]+1)
+        for neighbor in neighbors:   
+            if index_map[neighbor] > index_map[elem]:
+                right.append(chain_map[neighbor][1]+1)
         if right != []:
             chain_map[elem][1] = max(right)
 
     return chain_map
 
-def paper_use(n):
+
+def paper_use(n, k):
     result = dict()
     for i in range(1, n+1):
-        result[i] = [False, False]
+        result[i] = [False]*k
     return result
 
 
@@ -107,46 +112,53 @@ def check_rest_scores(n, should_have, paper_already_use):
     return True
 
 
-def sum_over(bound_assign):
-    result = []
-    for (s1, s2) in bound_assign:
-        result.append((s1[1]+s2[1])/2)
-    #print(result)
+def sum_tuple(t):
+    result = 0
+    for i in range(len(t)):
+        result += t[i][1]
     return result
 
-def check_assignment(n, k, l):
+
+def sum_over(bound_assign, k):
+    result = []
+    for assignment in bound_assign:
+        result.append(sum_tuple(assignment)/k)
+    return result
+
+
+def check_assignment(n, k, assignmentsList):
     for i in range(n):
-        if l[2*i] == l[2*i+1]:
+        if len(set(assignmentsList[k*i:k*(i+1)])) != k:
             return False
     return True
 
 
-#already assume k = 2 in multiple places below
 def actual_score(n, k, scoreset):
-    l = list(range(1, n+1)) + list(range(1, n+1))
-    #score_to_paper = assign_score_papers(n, k, scoreset)
-
-    random.shuffle(l)
+    assignmentsList = []
+    for i in range(k):
+        assignmentsList+=list(range(1, n+1))
+   
+    random.shuffle(assignmentsList)
     while(True):
-        random.shuffle(l)
-        if check_assignment(n, k, l) == True:
+        random.shuffle(assignmentsList)
+        if check_assignment(n, k, assignmentsList) == True:
             break
     for i in range(len(scoreset)):
-        paper = (scoreset[i][0]+1)//2
-        j = l.index(paper)
-        l[j] = scoreset[i]
+        paper = (scoreset[i][0]-1)//k +1
+        j = assignmentsList.index(paper)
+        assignmentsList[j] = scoreset[i]
     result = []
     for i in range(n):
-        result.append((l[2*i], l[2*i+1]))
+        result.append(tuple(assignmentsList[k*i:k*(i+1)]))
    
-    real_data = sorted(sum_over(result))
+    real_data = sorted(sum_over(result, k))
     return real_data
 
 
 def create_bounds(n, k, scoreset):
    
-    lower_paper_use = paper_use(n)
-    upper_paper_use = paper_use(n)
+    lower_paper_use = paper_use(n, k)
+    upper_paper_use = paper_use(n, k)
     
     assignments = valid_assignments(n, k, scoreset)
     sorted_assignments = sort_assignments(assignments)
@@ -159,20 +171,23 @@ def create_bounds(n, k, scoreset):
     i = 0
     rank = 0
     while rank < n:
+       
         while i < total_assignments:
-            (s1, s2) = sorted_assignments[i]
-            paper1 = (s1[0]+1)//2
-            paper2 = (s2[0]+1)//2
-            lower_paper_use[paper1][(s1[0]+1)%2] = True
-            lower_paper_use[paper2][(s2[0]+1)%2] = True
-            left_chain = chain_map[(s1, s2)][0]
-            if rank > n-3:
+           
+            w_tuple = sorted_assignments[i]
+            for j in range(len(w_tuple)):
+                score = w_tuple[j]
+                paper = (score[0]-1)//k + 1
+                lower_paper_use[paper][(score[0]+1)%k] = True
+
+            left_chain = chain_map[w_tuple][0]
+            if rank > n-k-1:
                 should_have = n-rank-1
                 bool1 = check_rest_scores(n, should_have, lower_paper_use)
             else:
                 bool1 = True
             if bool1 and left_chain>rank:
-                lower_bound_assign.append((s1, s2))
+                lower_bound_assign.append(w_tuple)
                 rank+=1
                 i+=1
                 break
@@ -182,27 +197,31 @@ def create_bounds(n, k, scoreset):
     upper_bound_assign = []
     i = 0
     rank = 0
+
     while rank < n:
+        
         while i < total_assignments:
-            (s1, s2) = sorted_assignments[total_assignments-1-i]
-            paper1 = (s1[0]+1)//2
-            paper2 = (s2[0]+1)//2
-            upper_paper_use[paper1][(s1[0]+1)%2] = True
-            upper_paper_use[paper2][(s2[0]+1)%2] = True
-            right_chain = chain_map[(s1, s2)][1]
-            if rank > n-3:
+            w_tuple = sorted_assignments[total_assignments-1-i]
+
+            for j in range(len(w_tuple)):
+                score = w_tuple[j]
+                paper = (score[0]-1)//k + 1
+                upper_paper_use[paper][(score[0]+1)%k] = True
+            
+            right_chain = chain_map[w_tuple][1]
+            if rank > n-k-1:
                 should_have = n-rank-1
                 bool1 = check_rest_scores(n, should_have, upper_paper_use)
             else:
                 bool1 = True
             if bool1 and right_chain>rank:
-                upper_bound_assign = [(s1, s2)] + upper_bound_assign 
+                upper_bound_assign = [w_tuple] + upper_bound_assign 
                 rank+=1
                 i+=1
                 break
             else:
                 i += 1
-    return(sum_over(lower_bound_assign), sum_over(upper_bound_assign))
+    return(sum_over(lower_bound_assign, k), sum_over(upper_bound_assign, k))
 
 
 
@@ -282,7 +301,7 @@ def simulation(n, k, times):
 
 
 
-def plot():
+def plot(times=100, k=2):
     #x-axis
     reviewers=[]
     
@@ -303,9 +322,8 @@ def plot():
 
     for numreviewer in range(10, 51, 10):
         reviewers.append(numreviewer)
-        times = 100
         tsqrt = np.sqrt(times)
-        (nr, pr, prbl, nstd, pstd, prblstd) = simulation(numreviewer, 2, times)
+        (nr, pr, prbl, nstd, pstd, prblstd) = simulation(numreviewer, k, times)
         noisy_accuracy.append(nr)
         noisy_sem.append(nstd/tsqrt)
 
@@ -336,9 +354,5 @@ def plot():
     plt.savefig('beta(a,a).pdf', bbox_inches='tight')
     plt.show()
     return(noisy_accuracy, noisy_sem, projection_accuracy, projection_sem, projection_accuracy_bl, projection_sem_bl)
-
-
-
-
 
 
