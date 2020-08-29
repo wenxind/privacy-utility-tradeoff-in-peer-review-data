@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import itertools 
 import matplotlib
 matplotlib.rcParams.update({'font.size': 28})
-
+random.seed(30)
 '''
 there are 2 papers per reviewer and 2 reviews per paper  ___ k 
 this number is fixed for simplicity of code
@@ -17,6 +17,10 @@ n can be changed
 - Add noise (for some fixed epsilon)
 - Measure accuracy with and without projection
 - Repeat form beginning (100 trials -- compute the mean accuracies and standard error)
+
+
+To compute cases where scores ~ Beta(a, a) with 10 reviewers and a in {0.5, 1, ..., 10},
+use the alternative loop in function plot(). 
 '''
 
 #scores are assigned to papers in the order of No.
@@ -340,7 +344,7 @@ def plot(times=100, k=2):
     plt.errorbar(a_list, noisy_accuracy, yerr = noisy_sem, color='r', capsize=6, elinewidth=8, linestyle='--', linewidth=4)
 
     projectedbl, = plt.plot(a_list, projection_accuracy_bl, '^',label = "Baseline projection", color='g', markersize=18)
-    plt.errorbar(a_list, projection_accuracy_bl, yerr = projection_sem_bl, color='g', capsize=8, elinewidth=6, linestyle='-.', linewidth=4)
+    plt.errorbar(a_list, projection_accuracy_bl, yerr = projection_sem_bl, color='g', capsize=6, elinewidth=8, linestyle='-.', linewidth=4)
 
     projected, = plt.plot(a_list, projection_accuracy, 'o',label = "Our algorithm", color='b', markersize=18)
     plt.errorbar(a_list, projection_accuracy, yerr = projection_sem, color='b', capsize=6, elinewidth=8, linestyle='-', linewidth=4)
