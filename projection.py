@@ -5,7 +5,10 @@ import matplotlib.pyplot as plt
 import itertools 
 import matplotlib
 matplotlib.rcParams.update({'font.size': 28})
+
+#used for Beta(a,a) plot
 random.seed(30)
+
 '''
 there are 2 papers per reviewer and 2 reviews per paper  ___ k 
 this number is fixed for simplicity of code
