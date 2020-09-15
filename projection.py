@@ -6,8 +6,9 @@ import itertools
 import matplotlib
 matplotlib.rcParams.update({'font.size': 28})
 
-#used for Beta(a,a) plot
+
 random.seed(30)
+np.random.seed(30)
 
 '''
 there are 2 papers per reviewer and 2 reviews per paper  ___ k 
@@ -162,6 +163,45 @@ def actual_score(n, k, scoreset):
     return real_data
 
 
+'''
+#use the alternative function below for beta(i, j) simulation
+def actual_score(n, k):
+    l = list(range(1, n+1)) + list(range(1, n+1))
+ 
+    random.shuffle(l)
+    while(True):
+        random.shuffle(l)
+        if check_assignment(n, k, l) == True:
+            break
+   
+    scoreset = []
+    used = set()
+    reviewer = 1
+    for i in range(n):
+       
+        if l[2*i] in used:
+            scoreset.append((2*l[2*i], np.random.beta(reviewer,l[2*i])))
+        else:
+            used.add(l[2*i])
+            scoreset.append((2*l[2*i]-1, np.random.beta(reviewer,l[2*i])))
+        if l[2*i+1] in used:
+            scoreset.append((2*l[2*i+1], np.random.beta(reviewer,l[2*i+1])))
+        else:
+            used.add(l[2*i+1])
+            scoreset.append((2*l[2*i+1]-1, np.random.beta(reviewer,l[2*i+1])))
+        reviewer+=1
+    for i in range(len(scoreset)):
+        paper = (scoreset[i][0]+1)//2
+        j = l.index(paper)
+        l[j] = scoreset[i]
+    result = []
+    for i in range(n):
+        result.append((l[2*i], l[2*i+1]))
+    real_data = sorted(sum_over(result))
+   
+    return (scoreset,real_data)
+'''
+
 def create_bounds(n, k, scoreset):
    
     lower_paper_use = paper_use(n, k)
@@ -235,8 +275,11 @@ def create_bounds(n, k, scoreset):
 #noise mean mu, variance 2b^2
 
 def projection(n, k):
+    #use the alternative line below instead of line 281 and 285 for beta(i,j)
+    #(scoreset, real_data) = actual_score(n, k)
+    
     scoreset = create_scores(n, k)
-
+    
     total_score = sum(score for (lable, score) in scoreset)/k
    
     real_data = actual_score(n, k, scoreset)
@@ -339,8 +382,24 @@ def plot(times=100, k=2):
 
         projection_accuracy_bl.append(prbl)
         projection_sem_bl.append(prblstd/tsqrt)
+    
+    #use the alternative loop below instead of line 373--384 for beta(a, a) simulation
+    '''
+    for cnt in range(1, 21):
+        a = cnt*0.5
+        a_list.append(a)
+        times = 100
+        tsqrt = np.sqrt(times)
+        (nr, pr, prbl, nstd, pstd, prblstd) = simulation(10, 2, times, a)
+        noisy_accuracy.append(nr)
+        noisy_sem.append(nstd/tsqrt)
 
-        
+        projection_accuracy.append(pr)
+        projection_sem.append(pstd/tsqrt)
+
+        projection_accuracy_bl.append(prbl)
+        projection_sem_bl.append(prblstd/tsqrt)
+    '''
 
     plt.figure(figsize=(10,7))
     noisy, = plt.plot(a_list, noisy_accuracy, 's',label = "Noisy", color='r', markersize=18)
