@@ -410,7 +410,6 @@ def plot(times=100, k=2):
 
     projected, = plt.plot(a_list, projection_accuracy, 'o',label = "Our algorithm", color='b', markersize=18)
     plt.errorbar(a_list, projection_accuracy, yerr = projection_sem, color='b', capsize=6, elinewidth=8, linestyle='-', linewidth=4)
-    #projected.set_label('After projection')
 
     plt.yscale('log')
     plt.ylabel('Mean squared error')
